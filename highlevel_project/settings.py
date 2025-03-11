@@ -12,6 +12,7 @@ https://docs.djangoproject.com/en/5.1/ref/settings/
 
 from pathlib import Path
 import os
+from decouple import config
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -127,10 +128,3 @@ STATIC_URL = 'static/'
 # https://docs.djangoproject.com/en/5.1/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
-
-# Add OAuth2 configuration
-OAUTH2_CLIENT_ID = '65c0a9a4277b2961322c545a-ls8q934d'
-OAUTH2_CLIENT_SECRET = '94af4663-c0c7-4340-9ce5-39b38e88c146'
-OAUTH2_REDIRECT_URI = 'http://127.0.0.1/'
-OAUTH2_TOKEN_URL = 'https://api.gohighlevel.com/oauth/token'
-OAUTH2_API_BASE_URL = 'https://api.gohighlevel.com/v1'

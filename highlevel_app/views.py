@@ -13,7 +13,7 @@ CUSTOM_FIELD_NAME = "DFS Booking Zoom Link"
 API_VERSION = "2021-07-28"
 BASE_URL = "https://services.leadconnectorhq.com"
 
-def get_auth_code(request):
+def initiate_auth(request):
     """Redirect user to HighLevel OAuth authorization page"""
     scope = "contacts.readonly+contacts.write+locations/customFields.readonly"
     auth_url = (
@@ -22,7 +22,7 @@ def get_auth_code(request):
     )
     return redirect(auth_url)
 
-def get_access_token(auth_code):
+def exchange_auth_code_for_token(auth_code):
     """Exchange auth code for an access token"""
     url = f"{BASE_URL}/oauth/token"
     payload = {
@@ -41,13 +41,13 @@ def get_access_token(auth_code):
         return None
     return response.json()
 
-def update_highlevel_contact(request):
+def handle_oauth_callback(request):
     """Process OAuth callback and store the access token"""
     auth_code = request.GET.get("code")  
     if not auth_code:
-        return get_auth_code(request)  
+        return initiate_auth(request)  
     
-    token_data = get_access_token(auth_code)
+    token_data = exchange_auth_code_for_token(auth_code)
     if not token_data or "access_token" not in token_data:
         return JsonResponse({"error": "Failed to get access token", "details": token_data}, status=400)
     
@@ -56,7 +56,7 @@ def update_highlevel_contact(request):
     request.session.modified = True
     return JsonResponse({"message": "Access token stored successfully", "access_token": access_token})
 
-def get_api_headers(access_token):
+def prepare_api_headers(access_token):
     """Return standardized API headers"""
     return {
         "Authorization": f"Bearer {access_token}",
@@ -64,14 +64,14 @@ def get_api_headers(access_token):
         "Accept": "application/json",
         "Content-Type": "application/json"
     }
-def get_all_contacts(request):
+def retrieve_all_contacts(request):
     """Fetch all contacts from HighLevel API"""
     access_token = request.session.get('access_token')  # ✅ Get token from session
     if not access_token:
         return JsonResponse({"error": "Missing access token. Please authenticate first."}, status=401)
 
     url = f"{BASE_URL}/contacts/?locationId={LOCATION_ID}"
-    headers = get_api_headers(access_token)
+    headers = prepare_api_headers(access_token)
     
     response = requests.get(url, headers=headers)
     if response.status_code != 200:
@@ -86,14 +86,14 @@ def get_all_contacts(request):
     
     return JsonResponse({"contacts": contacts})
 
-def get_random_contact(request):
+def fetch_random_contact(request):
     """Fetch a random contact from the API"""    
     access_token = request.session.get('access_token')  # ✅ Get token from session
     if not access_token:
         return JsonResponse({"error": "Missing access token. Please authenticate first."}, status=401)
 
     url = f"{BASE_URL}/contacts/?locationId={LOCATION_ID}"
-    headers = get_api_headers(access_token)
+    headers = prepare_api_headers(access_token)
     
     response = requests.get(url, headers=headers)
     if response.status_code != 200:
@@ -114,14 +114,14 @@ def get_random_contact(request):
         "phone": random_contact.get("phone", "No Phone")
     })
 
-def get_custom_fields(request):
+def retrieve_custom_fields(request):
     """Fetch all custom fields for contacts"""
     access_token = request.session.get('access_token')
     if not access_token:
         return JsonResponse({"error": "Missing access token. Please authenticate first."}, status=401)
 
     url = f"{BASE_URL}/locations/{LOCATION_ID}/customFields?model=contact"
-    headers = get_api_headers(access_token)
+    headers = prepare_api_headers(access_token)
     
     response = requests.get(url, headers=headers)
     print(f"Custom Fields API Response: {response.status_code}")
@@ -135,10 +135,10 @@ def get_custom_fields(request):
     custom_fields = response.json().get("customFields", [])
     return JsonResponse({"custom_fields": custom_fields})
 
-def find_custom_field_id(access_token, field_name):
+def locate_custom_field_id(access_token, field_name):
     """Find a specific custom field ID by name"""
     url = f"{BASE_URL}/locations/{LOCATION_ID}/customFields?model=contact"
-    headers = get_api_headers(access_token)
+    headers = prepare_api_headers(access_token)
     
     response = requests.get(url, headers=headers)
     if response.status_code != 200:
@@ -156,13 +156,13 @@ def find_custom_field_id(access_token, field_name):
     
     return None
 
-def update_random_contact(request):
+def modify_random_contact(request):
     """Update a random contact with the specified custom field value"""
     access_token = request.session.get('access_token')
     if not access_token:
         return JsonResponse({"error": "Missing access token. Please authenticate first."}, status=401)
 
-    headers = get_api_headers(access_token)
+    headers = prepare_api_headers(access_token)
 
     # Step 1: Get a random contact
     contacts_url = f"{BASE_URL}/contacts/?locationId={LOCATION_ID}"
@@ -184,7 +184,7 @@ def update_random_contact(request):
     contact_name = random_contact.get("name", "Unknown Contact")
     
     # Step 2: Get the custom field ID
-    custom_field_id = find_custom_field_id(access_token, CUSTOM_FIELD_NAME)
+    custom_field_id = locate_custom_field_id(access_token, CUSTOM_FIELD_NAME)
     
     # Step 3: Update the contact with the custom field
     update_url = f"{BASE_URL}/contacts/{contact_id}"
@@ -238,12 +238,3 @@ def update_random_contact(request):
         "updated_value": "TEST"
     })
     
-def debug_session(request):
-    request.session["test"] = "Session works!"  # Setting a test session value
-    access_token = request.session.get("access_token", "No access token found")
-    print("Stored Access Token:", access_token)
-    return JsonResponse({
-        "message": "Session set!",
-        "session_data": dict(request.session),
-        "access_token": access_token  # Include access token in response
-    })
